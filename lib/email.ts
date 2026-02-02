@@ -1,7 +1,13 @@
 import { Resend } from 'resend';
 import { DigestSection } from '@/types';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend: Resend;
+function getResend() {
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resend;
+}
 
 function formatDate(): string {
   return new Date().toLocaleDateString('en-US', {
@@ -127,7 +133,7 @@ export async function sendDigest(sections: DigestSection[]): Promise<void> {
   );
   const html = generateHtml(sections);
 
-  const { error } = await resend.emails.send({
+  const { error } = await getResend().emails.send({
     from: 'Reddit Digest <onboarding@resend.dev>',
     to: email,
     subject: `Reddit Digest - ${formatDate()} (${totalPosts} posts)`,

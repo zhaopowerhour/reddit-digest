@@ -1,3 +1,6 @@
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+
 import { SECTIONS } from '../config/subreddits';
 import { fetchSubredditPosts, fetchComments } from '../lib/reddit';
 import { summarizePost } from '../lib/summarize';
@@ -35,8 +38,8 @@ async function main() {
             topComments: comments,
           });
 
-          // Small delay between posts
-          await new Promise((resolve) => setTimeout(resolve, 200));
+          // Delay between posts to avoid rate limits
+          await new Promise((resolve) => setTimeout(resolve, 3000));
         }
 
         if (summarizedPosts.length > 0) {

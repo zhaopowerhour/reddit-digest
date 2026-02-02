@@ -1,13 +1,19 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { RedditPost, RedditComment } from '@/types';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+let genAI: GoogleGenerativeAI;
+function getGenAI() {
+  if (!genAI) {
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+  }
+  return genAI;
+}
 
 export async function summarizePost(
   post: RedditPost,
   comments: RedditComment[]
 ): Promise<string> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
 
   const content = post.is_self ? post.selftext : `Link: ${post.url}`;
   const commentText = comments
@@ -30,14 +36,25 @@ Format your response EXACTLY like this:
 
 Keep bullet points short (under 15 words each). Max 3 bullets. No preamble.`;
 
-  try {
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    return response.text().trim();
-  } catch (error) {
-    console.error(`Failed to summarize post ${post.id}:`, error);
-    return 'Summary unavailable.';
+  const maxRetries = 3;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      return response.text().trim();
+    } catch (error: unknown) {
+      const isRateLimit = error instanceof Error && error.message?.includes('429');
+      if (isRateLimit && attempt < maxRetries - 1) {
+        const delay = Math.pow(2, attempt + 2) * 1000; // 4s, 8s, 16s
+        console.log(`Rate limited, waiting ${delay/1000}s before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      console.error(`Failed to summarize post ${post.id}:`, error);
+      return 'Summary unavailable.';
+    }
   }
+  return 'Summary unavailable.';
 }
 
 export async function summarizePostBatch(
